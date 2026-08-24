@@ -11,7 +11,8 @@ const { geoNaturalEarth1, geoAzimuthalEqualArea, geoPath, geoCentroid, geoArea }
 const worldCountries = require('world-countries');
 
 const topoPath = process.argv[2];
-if (!topoPath) { console.error('usage: build-geodata.mjs <countries-110m.json>'); process.exit(1); }
+const cjDir = process.argv[3]; // optional: country-json src dir for population/religion/etc.
+if (!topoPath) { console.error('usage: build-geodata.mjs <countries-110m.json> [country-json-src-dir]'); process.exit(1); }
 const topo = require(topoPath);
 const fc = feature(topo, topo.objects.countries);
 
@@ -22,6 +23,41 @@ const nameFixes = new Map([
   ['Kosovo', 'XK'], ['N. Cyprus', null], ['Somaliland', null],
 ]);
 const byCca2 = new Map(worldCountries.map(c => [c.cca2, c]));
+
+// --- extra almanac data from country-json (keyed by its own country names) ---
+const cjAlias = { // world-countries common name -> country-json name
+  'Fiji': 'Fiji Islands', 'DR Congo': 'The Democratic Republic of Congo',
+  'Republic of the Congo': 'Congo', 'Timor-Leste': 'East Timor',
+  'Türkiye': 'Turkey', 'Czechia': 'Czech Republic',
+};
+// countries absent from country-json entirely
+const cjManual = {
+  'Taiwan': { pop: 23400000, rel: 'Buddhism, Taoism', dish: 'Beef noodle soup', life: 80.5, gov: 'Republic', temp: 22 },
+  'Kosovo': { pop: 1800000, rel: 'Islam', dish: 'Flija', life: 76.5, gov: 'Republic', temp: 10 },
+};
+let cjFor = () => ({});
+if (cjDir) {
+  const load = n => {
+    const m = new Map();
+    for (const row of require(join(cjDir, 'country-by-' + n + '.json'))) m.set(row.country, row);
+    return m;
+  };
+  const pop = load('population'), rel = load('religion'), dish = load('national-dish'),
+        life = load('life-expectancy'), gov = load('government-type'), temp = load('yearly-average-temperature');
+  cjFor = name => {
+    if (cjManual[name]) return cjManual[name];
+    const n = cjAlias[name] || name;
+    const num = v => (typeof v === 'number' ? v : (v ? Number(v) : null)) || null;
+    return {
+      pop: num(pop.get(n)?.population),
+      rel: rel.get(n)?.religion || null,
+      dish: dish.get(n)?.dish || null,
+      life: num(life.get(n)?.expectancy),
+      gov: gov.get(n)?.government || null,
+      temp: num(temp.get(n)?.temperature),
+    };
+  };
+}
 
 function roundedContext(dec) {
   const f = 10 ** dec;
@@ -95,6 +131,7 @@ for (const feat of fc.features) {
   worldPathGen(feat);
   const mapD = worldCtx.result();
   const [cx, cy] = worldProj(geoCentroid(feat));
+  const cj = cjFor(meta.name.common);
   countries.push({
     a2: meta.cca2,
     name: meta.name.common,
@@ -105,6 +142,16 @@ for (const feat of fc.features) {
     area: meta.area,
     ll: meta.latlng,
     cx: Math.round(cx), cy: Math.round(cy),
+    langs: Object.values(meta.languages || {}).slice(0, 4),
+    cur: Object.values(meta.currencies || {}).map(c => c.name).slice(0, 2),
+    landlocked: meta.landlocked ? 1 : 0,
+    nb: (meta.borders || []).length,
+    pop: cj.pop ?? null,
+    rel: cj.rel ?? null,
+    dish: cj.dish ?? null,
+    life: cj.life ?? null,
+    gov: cj.gov ?? null,
+    temp: cj.temp ?? null,
     map: mapD,
     shape: shapeFor(feat),
   });

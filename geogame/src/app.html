@@ -162,12 +162,39 @@ svg { display: block; }
 .newprof input { flex: 1; font: inherit; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--panel); color: var(--ink); min-width: 0; }
 .newprof button { flex-shrink: 0; width: auto; padding: 12px 18px; }
 
+/* ---------- country sheet & atlas ---------- */
+.qf { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; margin-top: 12px; padding: 11px 14px; }
+.qf .flg { font-size: 30px; }
+.qf .t { flex: 1; min-width: 0; }
+.qf .t b { font-size: 16.5px; }
+.qf .t .caption { display: block; margin-top: 1px; }
+.qf .chev { color: var(--muted); font-size: 22px; }
+.backdrop { position: fixed; inset: 0; background: rgba(8, 14, 18, .55); display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
+.sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 18px 18px 0 0; max-width: 640px; width: 100%; max-height: 88dvh; overflow-y: auto; padding: 16px 18px calc(22px + env(safe-area-inset-bottom)); }
+.sheet-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.sheet-head .flg { font-size: 44px; }
+.sheet-head h2 { font-size: 30px; font-weight: 800; letter-spacing: .02em; }
+.sheet-map { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); margin: 10px 0 4px; }
+.sheet-map svg { width: 100%; height: auto; }
+.sheet-map path { fill: var(--land); stroke: var(--land-line); stroke-width: .5; }
+.sheet-map path.hit { fill: var(--accent); }
+.statrow { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 8.5px 0; border-bottom: 1px solid var(--line); font-size: 15.5px; }
+.statrow:last-child { border-bottom: none; }
+.statrow .k { color: var(--muted); flex-shrink: 0; }
+.statrow .v { text-align: right; font-weight: 500; }
+.atlas-search { width: 100%; font: inherit; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--panel); color: var(--ink); margin-bottom: 6px; }
+.atlas-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 4px; border-bottom: 1px solid var(--line); }
+.atlas-row:last-child { border-bottom: none; }
+.atlas-row .flg { font-size: 26px; width: 34px; }
+.atlas-row .t b { display: block; font-size: 16px; }
+
 @keyframes pop { 0% { transform: scale(.96); } 60% { transform: scale(1.02); } 100% { transform: scale(1); } }
 .pop { animation: pop .18s ease-out; }
 @media (prefers-reduced-motion: reduce) { .pop { animation: none; } }
 </style>
 
 <div id="app"></div>
+<div id="sheet"></div>
 
 <script id="gg-state" type="application/json">{"v":1,"players":{}}</script>
 <script id="gg-geodata" type="application/json">"__GEODATA__"</script>
@@ -197,6 +224,19 @@ const cinfo = a2 => byA2[a2] || EXTRA[a2];
 const tierOf = a2 => CUR.tier1.includes(a2) ? 1 : CUR.tier3.includes(a2) ? 3 : 2;
 const TMULT = { 1: 1, 2: 1.5, 3: 2 };
 
+const RELIGIONS = [...new Set(QUIZ.map(c => c.rel).filter(Boolean))];
+const ALL_LANGS = [...new Set(QUIZ.flatMap(c => c.langs || []))];
+const ALL_CURS = [...new Set(QUIZ.flatMap(c => c.cur || []))];
+function fmtPop(n) {
+  if (n == null) return null;
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6) >= 20 ? Math.round(n / 1e6) + 'M' : (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return Math.round(n / 1e3) + 'k';
+  return String(n);
+}
+function fmtInt(n) { return n == null ? null : Math.round(n).toLocaleString('en-US'); }
+function firstDish(c) { return c.dish ? c.dish.split(',')[0].trim() : null; }
+
 const CITIES = CUR.cities.map(([name, a2, tier, lat, lon]) => ({ name, a2, tier, ll: [lat, lon] }));
 const FEATS = CUR.features.map(([name, type, tier, lat, lon, fact]) => ({ name, type, tier, ll: [lat, lon], fact }));
 const FTYPE = { river: 'River', desert: 'Desert', mountain: 'Peaks & ranges', lake: 'Lake', sea: 'Seas & straits' };
@@ -214,6 +254,7 @@ const MODES = {
   maphunt:  { label: 'Map Hunt', desc: 'Find it on the world map' },
   cities:   { label: 'Cities',   desc: 'Place the city in its country' },
   nature:   { label: 'Nature',   desc: 'Rivers, deserts, peaks, seas' },
+  trivia:   { label: 'Trivia',   desc: 'People, money, dishes, religions' },
   review:   { label: 'Review misses', desc: 'Retry what got away' },
   daily:    { label: 'Daily Duel', desc: 'Same ten questions for everyone — one attempt' },
 };
@@ -224,6 +265,8 @@ const GLYPHS = {
   maphunt: '<circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/>',
   cities: '<path d="M3 21V11h4.5v10M9.5 21V4H15v17M17 21v-7.5h4V21M2 21h20"/>',
   nature: '<path d="M2 20l6.5-11 4 6.5L15.5 11l6.5 9z"/>',
+  trivia: '<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M9 9h.01M15 9h.01M9 15h.01M15 15h.01"/>',
+  atlas: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
   review: '<path d="M20 12a8 8 0 1 1-2.4-5.7M20 2.5V7h-4.5"/>',
   daily: '<circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>',
   stats: '<path d="M4 20v-8M10 20V5M16 20v-11M2 20h20"/>',
@@ -278,7 +321,7 @@ function buildDocument() {
     '<title>Globetrot<\/title>' +
     '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">' +
     '<style id="gg-css">' + document.getElementById('gg-css').textContent + '<\/style>' +
-    '</head><body><div id="app"></div>' +
+    '</head><body><div id="app"></div><div id="sheet"></div>' +
     '<script id="gg-state" type="application/json">' + stateJson + SC +
     '<script id="gg-geodata" type="application/json">' + g('gg-geodata') + SC +
     '<script id="gg-curated" type="application/json">' + g('gg-curated') + SC +
@@ -396,10 +439,10 @@ function questionFor(mode, item, diff) {
     const d = countryDistractors(item, pool, 3, diff);
     if (rand() < 0.5) {
       const { opts, answer } = mkOptions(item.capital, d.map(c => c.capital));
-      return { mode, key: 'capitals:' + item.a2, tier: tierOf(item.a2), prompt: 'What is the capital of ' + item.name + '?', opts, answer };
+      return { mode, key: 'capitals:' + item.a2, tier: tierOf(item.a2), prompt: 'What is the capital of ' + item.name + '?', opts, answer, revealA2: item.a2 };
     }
     const { opts, answer } = mkOptions(item.name, d.map(c => c.name));
-    return { mode, key: 'capitals:' + item.a2, tier: tierOf(item.a2), prompt: item.capital + ' is the capital of…', opts, answer, optFlags: opts.map(n => (P.find(c => c.name === n) || {}).flag || '') };
+    return { mode, key: 'capitals:' + item.a2, tier: tierOf(item.a2), prompt: item.capital + ' is the capital of…', opts, answer, optFlags: opts.map(n => (P.find(c => c.name === n) || {}).flag || ''), revealA2: item.a2 };
   }
   if (mode === 'maphunt') {
     return { mode, key: 'maphunt:' + item.a2, tier: tierOf(item.a2), prompt: 'Find ' + item.name, sub: item.subregion, targetA2: item.a2 };
@@ -409,8 +452,9 @@ function questionFor(mode, item, diff) {
     const pool = P.concat(Object.values(EXTRA));
     const d = countryDistractors(ansInfo, pool, 3, diff);
     const { opts, answer } = mkOptions(ansInfo.name, d.map(c => c.name));
-    return { mode, key: 'cities:' + item.name, tier: item.tier, prompt: 'Which country is ' + item.name + ' in?', opts, answer, revealLL: item.ll, revealLabel: item.name, optFlags: opts.map(n => { const c = pool.find(x => x.name === n); return c ? c.flag : ''; }) };
+    return { mode, key: 'cities:' + item.name, tier: item.tier, prompt: 'Which country is ' + item.name + ' in?', opts, answer, revealLL: item.ll, revealLabel: item.name, optFlags: opts.map(n => { const c = pool.find(x => x.name === n); return c ? c.flag : ''; }), revealA2: byA2[item.a2] ? item.a2 : null };
   }
+  if (mode === 'trivia') return triviaQuestion(item, diff);
   if (mode === 'nature') {
     // keep distractors geographically distinct so a neighboring feature isn't "also right"
     const far = f => Math.hypot(f.ll[0] - item.ll[0], f.ll[1] - item.ll[1]) > 7;
@@ -436,13 +480,69 @@ function buildDailyRound() {
   grab('flags', QUIZ.filter(c => c.flag && c.a2 !== 'XK'), 2, c => 'flags:' + c.a2, c => tierOf(c.a2));
   grab('shapes', QUIZ, 2, c => 'shapes:' + c.a2, c => tierOf(c.a2));
   grab('capitals', QUIZ.filter(c => c.capital), 2, c => 'capitals:' + c.a2, c => tierOf(c.a2));
-  grab('cities', CITIES, 2, c => 'cities:' + c.name, c => c.tier);
+  grab('cities', CITIES, 1, c => 'cities:' + c.name, c => c.tier);
   grab('nature', FEATS, 1, f => 'nature:' + f.name, f => f.tier);
   grab('maphunt', QUIZ, 1, c => 'maphunt:' + c.a2, c => tierOf(c.a2));
+  grab('trivia', QUIZ.filter(c => c.pop), 1, c => 'trivia:' + c.a2, c => tierOf(c.a2));
   shuffle(qs);
   rand = saved;
   return { mode: 'daily', diff: 'mixed', qs };
 }
+function triviaQuestion(c, diff) {
+  const base = { mode: 'trivia', key: 'trivia:' + c.a2, tier: tierOf(c.a2), revealA2: c.a2 };
+  const kinds = [];
+  const popRivals = c.pop ? QUIZ.filter(x => x.pop && x.a2 !== c.a2 && x.pop <= c.pop / 1.6) : [];
+  const areaRivals = c.area ? QUIZ.filter(x => x.area && x.a2 !== c.a2 && x.area <= c.area / 1.6) : [];
+  if (popRivals.length >= 3) kinds.push('popmax');
+  if (areaRivals.length >= 3) kinds.push('areamax');
+  if (c.rel && RELIGIONS.length >= 4) kinds.push('religion');
+  if (c.langs && c.langs.length) kinds.push('language');
+  if (c.cur && c.cur.length) kinds.push('currency');
+  if (firstDish(c)) kinds.push('dish');
+  if (c.landlocked) kinds.push('landlocked');
+  const kind = kinds.length ? kinds[Math.floor(rand() * kinds.length)] : 'region';
+  const withFlags = (opts) => opts.map(n => { const x = QUIZ.find(q => q.name === n); return x ? x.flag : ''; });
+  if (kind === 'region') {
+    const d = sample([...new Set(QUIZ.map(x => x.region))].filter(r => r !== c.region), 3);
+    const { opts, answer } = mkOptions(c.region, d);
+    return { ...base, prompt: 'Which continent is ' + c.name + ' in?', sub: c.flag, opts, answer };
+  }
+  if (kind === 'popmax' || kind === 'areamax') {
+    const rivals = kind === 'popmax' ? popRivals : areaRivals;
+    const near = rivals.filter(x => x.region === c.region);
+    const picks = sample(near.length >= 3 ? near : rivals, 3);
+    const { opts, answer } = mkOptions(c.name, picks.map(x => x.name));
+    return { ...base, prompt: kind === 'popmax' ? 'Which of these has the most people?' : 'Which of these is the largest by area?', opts, answer, optFlags: withFlags(opts) };
+  }
+  if (kind === 'religion') {
+    const d = sample(RELIGIONS.filter(r => r !== c.rel), 3);
+    const { opts, answer } = mkOptions(c.rel, d);
+    return { ...base, prompt: 'What is the main religion in ' + c.name + '?', sub: c.flag + ' ' + c.subregion, opts, answer };
+  }
+  if (kind === 'language') {
+    const mine = c.langs[Math.floor(rand() * c.langs.length)];
+    const d = sample(ALL_LANGS.filter(l => !c.langs.includes(l)), 3);
+    const { opts, answer } = mkOptions(mine, d);
+    return { ...base, prompt: 'Which of these is an official language of ' + c.name + '?', sub: c.flag + ' ' + c.subregion, opts, answer };
+  }
+  if (kind === 'currency') {
+    const d = sample(ALL_CURS.filter(x => !c.cur.includes(x)), 3);
+    const { opts, answer } = mkOptions(c.cur[0], d);
+    return { ...base, prompt: 'What currency would you pay with in ' + c.name + '?', sub: c.flag + ' ' + c.subregion, opts, answer };
+  }
+  if (kind === 'dish') {
+    const d = countryDistractors(c, QUIZ.filter(x => x.a2 !== c.a2), 3, diff);
+    const { opts, answer } = mkOptions(c.name, d.map(x => x.name));
+    return { ...base, prompt: firstDish(c) + ' is a classic dish of which country?', opts, answer, optFlags: withFlags(opts) };
+  }
+  // landlocked
+  const coastal = QUIZ.filter(x => !x.landlocked && x.a2 !== c.a2);
+  const near = coastal.filter(x => x.region === c.region);
+  const picks = sample(near.length >= 3 ? near : coastal, 3);
+  const { opts, answer } = mkOptions(c.name, picks.map(x => x.name));
+  return { ...base, prompt: 'Which of these countries is landlocked?', sub: 'No coastline at all', opts, answer, optFlags: withFlags(opts) };
+}
+
 function buildRound(mode, diff, p) {
   const N = 10;
   let qs = [];
@@ -474,6 +574,7 @@ function buildRound(mode, diff, p) {
     let pool = QUIZ;
     if (mode === 'flags') pool = pool.filter(c => c.flag && c.a2 !== 'XK'); // XK flag emoji doesn't render on iOS
     if (mode === 'capitals') pool = pool.filter(c => c.capital);
+    if (mode === 'trivia') pool = pool.filter(c => c.pop);
     const items = pickWeighted(pool, N, p, c => mode + ':' + c.a2, c => tierOf(c.a2), diff);
     qs = items.map(i => questionFor(mode, i, diff));
   }
@@ -530,6 +631,7 @@ function render() {
   else if (screen === 'round') renderRound();
   else if (screen === 'summary') renderSummary();
   else if (screen === 'stats') renderStats();
+  else if (screen === 'atlas') renderAtlas();
 }
 
 function renderProfiles() {
@@ -568,6 +670,7 @@ function renderHome() {
   app.innerHTML =
     '<div class="topbar">' +
     '<span class="wordmark">GL<span class="o">O</span>BETROT</span><span class="spacer"></span>' +
+    '<button class="iconbtn" data-act="atlas" aria-label="Atlas">' + glyph('atlas') + '</button>' +
     '<button class="iconbtn" data-act="stats" aria-label="Statistics">' + glyph('stats') + '</button>' +
     '<button class="avatar" data-act="switch-prof" style="background:' + p.color + '" aria-label="Switch player">' + escHtml(profile[0].toUpperCase()) + '</button>' +
     '</div>' +
@@ -583,6 +686,7 @@ function renderHome() {
       '<button data-act="diff" data-diff="' + d + '" class="' + (d === diff ? 'on' : '') + '">' + d[0].toUpperCase() + d.slice(1) + '</button>').join('') + '</div>' +
     '<div class="modes">' +
     modeCard('flags') + modeCard('shapes') + modeCard('capitals') + modeCard('maphunt') + modeCard('cities') + modeCard('nature') +
+    modeCard('trivia', true) +
     (missCount >= 5 ? modeCard('review', true) : '') +
     '</div>' +
     '<div class="syncline" id="syncline">' + syncHtml() + '</div>';
@@ -785,10 +889,11 @@ function answerChoice(i) {
   const fb = document.getElementById('feedback');
   let extra = '';
   if (q.fact) extra = '<div class="factbox">' + escHtml(q.fact) + '</div>';
-  else if (q.revealLL) {
+  if (q.revealLL) {
     const vb = zoomedVb(q.revealLL, 3.2);
-    extra = '<div class="minimap" style="margin-top:12px"><svg viewBox="' + vb.join(' ') + '"><g>' + MAP_PATHS + '</g>' + markerSvg(q.revealLL, vb[2]) + '</svg></div>';
+    extra += '<div class="minimap" style="margin-top:12px"><svg viewBox="' + vb.join(' ') + '"><g>' + MAP_PATHS + '</g>' + markerSvg(q.revealLL, vb[2]) + '</svg></div>';
   }
+  if (q.revealA2) extra += quickFactsHtml(q.revealA2);
   if (fb) fb.innerHTML = extra;
   const nb = document.getElementById('nextbar');
   if (nb) nb.innerHTML = '<button class="btn btn-primary" data-act="next">' + (round.i + 1 < round.qs.length ? 'Continue' : 'See results') + '</button>';
@@ -817,9 +922,92 @@ function confirmMap() {
   const nb = document.getElementById('nextbar');
   if (nb) nb.innerHTML =
     (correct ? '' : '<p class="caption" style="text-align:center;margin:0 0 8px">That was ' + escHtml((byA2[round.selA2] || {}).name || 'not it') + ' — ' + escHtml(byA2[q.targetA2].name) + ' is highlighted.</p>') +
-    '<button class="btn btn-primary" data-act="next">' + (round.i + 1 < round.qs.length ? 'Continue' : 'See results') + '</button>';
+    quickFactsHtml(q.targetA2) +
+    '<button class="btn btn-primary" data-act="next" style="margin-top:10px">' + (round.i + 1 < round.qs.length ? 'Continue' : 'See results') + '</button>';
   const dotEls = document.querySelectorAll('.dots span');
   if (dotEls[round.i]) dotEls[round.i].className = correct ? 'good' : 'bad';
+}
+
+function quickFactsHtml(a2) {
+  const c = byA2[a2];
+  if (!c) return '';
+  const bits = [];
+  if (c.pop) bits.push(fmtPop(c.pop) + ' people');
+  if (c.langs && c.langs.length) bits.push(c.langs.slice(0, 2).join(', '));
+  if (c.cur && c.cur.length) bits.push(c.cur[0]);
+  return '<button class="card qf" data-act="sheet" data-a2="' + a2 + '">' +
+    '<span class="flg">' + (c.flag || '') + '</span>' +
+    '<span class="t"><b>' + escHtml(c.name) + '</b>' +
+    '<span class="caption">' + escHtml(bits.join(' · ')) + '</span></span>' +
+    '<span class="chev">›</span></button>';
+}
+
+function sheetMapVb(c) {
+  const z = c.area >= 3e6 ? 1.5 : c.area >= 5e5 ? 2.2 : c.area >= 5e4 ? 3.2 : 4.5;
+  return zoomedVb(c.ll, z);
+}
+function showSheet(a2) {
+  const c = byA2[a2];
+  if (!c) return;
+  const row = (k, v) => v == null || v === '' ? '' :
+    '<div class="statrow"><span class="k">' + k + '</span><span class="v">' + escHtml(String(v)) + '</span></div>';
+  const chips = [];
+  if (c.landlocked) chips.push('Landlocked');
+  if (c.nb === 0 && !c.landlocked) chips.push('Island nation');
+  const sheetEl = document.getElementById('sheet');
+  sheetEl.innerHTML =
+    '<div class="backdrop"><div class="sheet">' +
+    '<div class="sheet-head"><span class="flg">' + (c.flag || '') + '</span>' +
+    '<span style="flex:1"><h2>' + escHtml(c.name) + '</h2>' +
+    '<span class="caption">' + escHtml(c.subregion || c.region) + (chips.length ? ' · ' + chips.join(' · ') : '') + '</span></span>' +
+    '<button class="iconbtn" data-act="close-sheet" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+    '<div class="sheet-map"><svg viewBox="' + sheetMapVb(c).join(' ') + '"><g>' + MAP_PATHS + '</g></svg></div>' +
+    row('Capital', c.capital) +
+    row('Population', c.pop ? fmtPop(c.pop) : null) +
+    row('Area', c.area ? fmtInt(c.area) + ' km²' : null) +
+    row('Languages', c.langs && c.langs.length ? c.langs.join(', ') : null) +
+    row('Currency', c.cur && c.cur.length ? c.cur.join(', ') : null) +
+    row('Main religion', c.rel) +
+    row('Government', c.gov) +
+    row('Life expectancy', c.life ? '≈ ' + Math.round(c.life) + ' years' : null) +
+    row('Avg temperature', c.temp != null ? Math.round(c.temp) + ' °C' : null) +
+    row('Neighbors', c.nb > 0 ? c.nb : null) +
+    row('Classic dishes', c.dish) +
+    '</div></div>';
+  const tgt = sheetEl.querySelector('.sheet-map path[data-a2="' + a2 + '"]');
+  if (tgt) tgt.classList.add('hit');
+  const bd = sheetEl.querySelector('.backdrop');
+  bd.addEventListener('click', e => { if (e.target === bd) hideSheet(); });
+  sheetEl.querySelector('[data-act="close-sheet"]').addEventListener('click', hideSheet);
+}
+function hideSheet() { document.getElementById('sheet').innerHTML = ''; }
+
+let atlasQ = '';
+function renderAtlas() {
+  app.innerHTML =
+    '<div class="topbar">' +
+    '<button class="iconbtn" data-act="home" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>' +
+    '<h2 style="font-size:24px">Atlas</h2></div>' +
+    '<input class="atlas-search" id="atlasq" placeholder="Search countries or capitals…" autocomplete="off">' +
+    '<div id="atlaslist"></div>';
+  const input = document.getElementById('atlasq');
+  input.value = atlasQ;
+  input.addEventListener('input', () => { atlasQ = input.value; renderAtlasList(); });
+  renderAtlasList();
+}
+function renderAtlasList() {
+  const q = atlasQ.trim().toLowerCase();
+  const match = c => !q || c.name.toLowerCase().includes(q) || (c.capital || '').toLowerCase().includes(q);
+  const groups = {};
+  for (const c of QUIZ) if (match(c)) (groups[c.region] = groups[c.region] || []).push(c);
+  const html = Object.keys(groups).sort().map(region =>
+    '<div class="sect display">' + escHtml(region) + '</div><div class="card panelpad">' +
+    groups[region].sort((a, b) => a.name.localeCompare(b.name)).map(c =>
+      '<button class="atlas-row" data-act="sheet" data-a2="' + c.a2 + '">' +
+      '<span class="flg">' + (c.flag || '') + '</span>' +
+      '<span class="t"><b>' + escHtml(c.name) + '</b><span class="caption">' + escHtml(c.capital || '') + '</span></span></button>'
+    ).join('') + '</div>').join('');
+  document.getElementById('atlaslist').innerHTML = html || '<p class="caption" style="text-align:center;margin-top:20px">Nothing matches that search.</p>';
 }
 
 function nextQuestion() {
@@ -903,7 +1091,7 @@ function renderStats() {
   const regions = {};
   for (const k in p.items) {
     const m = k.slice(0, k.indexOf(':')), id = k.slice(k.indexOf(':') + 1);
-    if (!['flags', 'shapes', 'capitals', 'maphunt'].includes(m)) continue;
+    if (!['flags', 'shapes', 'capitals', 'maphunt', 'trivia'].includes(m)) continue;
     const c = byA2[id]; if (!c) continue;
     const r = regions[c.region] || (regions[c.region] = { r: 0, w: 0 });
     r.r += p.items[k].r; r.w += p.items[k].w;
@@ -971,6 +1159,8 @@ app.addEventListener('click', e => {
   else if (act === 'again') startRound(round.mode);
   else if (act === 'quit' || act === 'home') { screen = 'home'; round = null; render(); }
   else if (act === 'stats') { screen = 'stats'; render(); }
+  else if (act === 'atlas') { screen = 'atlas'; render(); }
+  else if (act === 'sheet') showSheet(btn.getAttribute('data-a2'));
   else if (act === 'zoom') {
     if (!mapVb) return;
     zoomAt(mapVb[0] + mapVb[2] / 2, mapVb[1] + mapVb[3] / 2, btn.getAttribute('data-z') === 'in' ? 0.62 : 1.6);

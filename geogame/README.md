@@ -1,8 +1,10 @@
 # Globetrot
 
 A mobile-first geography quiz game — flags, country shapes, capitals, find-it-on-the-map,
-world cities, and natural features (rivers, deserts, mountains, lakes, seas) across four
-difficulty settings, with per-player progress tracking.
+world cities, natural features (rivers, deserts, mountains, lakes, seas), and almanac
+trivia (population, religion, languages, currencies, national dishes) across four
+difficulty settings, with per-player progress tracking, a shared Daily Duel, and a
+browsable country Atlas with per-country stat sheets.
 
 Play it as a published Claude artifact (private link, works on phones and tablets).
 Everything is a single self-contained `index.html` — no server, no external dependencies
@@ -17,6 +19,10 @@ beyond Google Fonts.
 - `tools/build-geodata.mjs` — regenerates `data/geodata.json` from
   [world-atlas](https://www.npmjs.com/package/world-atlas) TopoJSON joined with
   [world-countries](https://www.npmjs.com/package/world-countries) metadata
+  (languages, currencies, landlocked, borders) and, when given the
+  [country-json](https://www.npmjs.com/package/country-json) src dir as a second
+  argument, its almanac datasets (population, religion, national dish,
+  life expectancy, government, average temperature)
 - `tools/build.mjs` — inlines the data into `src/app.html` → `index.html`
 
 ## Building
@@ -27,7 +33,8 @@ npm install topojson-client d3-geo world-countries
 npm pack world-atlas@2.0.2 && tar xzf world-atlas-2.0.2.tgz
 
 # regenerate geodata (only needed if the conversion changes)
-node tools/build-geodata.mjs path/to/package/countries-110m.json
+npm pack country-json && tar xzf country-json-*.tgz -C country-json-src --strip-components=1
+node tools/build-geodata.mjs path/to/package/countries-110m.json country-json-src/src
 
 # assemble the game
 node tools/build.mjs
