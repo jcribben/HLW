@@ -1,0 +1,922 @@
+<title>Globetrot</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<style id="gg-css">
+:root {
+  --bg: #F1EFE6; --panel: #FAF8F1; --panel2: #ECE8DA;
+  --ink: #22303A; --muted: #6D7466;
+  --accent: #0E7C7B; --accent-ink: #0A5A59; --accent-soft: rgba(14,124,123,.14);
+  --brass: #A87E2F; --good: #3E7C4F; --good-soft: rgba(62,124,79,.16);
+  --bad: #BC4B32; --bad-soft: rgba(188,75,50,.14);
+  --line: rgba(34,48,58,.16); --land: #DAD5C2; --land-line: #F1EFE6;
+  --shadow: 0 1px 2px rgba(34,48,58,.08), 0 4px 14px rgba(34,48,58,.07);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1922; --panel: #16242F; --panel2: #1D2E3B;
+    --ink: #E9E4D3; --muted: #97A296;
+    --accent: #3BB8AE; --accent-ink: #7FD6CE; --accent-soft: rgba(59,184,174,.16);
+    --brass: #D9A441; --good: #6FBF85; --good-soft: rgba(111,191,133,.16);
+    --bad: #E0785C; --bad-soft: rgba(224,120,92,.16);
+    --line: rgba(233,228,211,.15); --land: #263B49; --land-line: #0E1922;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1922; --panel: #16242F; --panel2: #1D2E3B;
+  --ink: #E9E4D3; --muted: #97A296;
+  --accent: #3BB8AE; --accent-ink: #7FD6CE; --accent-soft: rgba(59,184,174,.16);
+  --brass: #D9A441; --good: #6FBF85; --good-soft: rgba(111,191,133,.16);
+  --bad: #E0785C; --bad-soft: rgba(224,120,92,.16);
+  --line: rgba(233,228,211,.15); --land: #263B49; --land-line: #0E1922;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: 'Alegreya Sans', 'Gill Sans', 'Trebuchet MS', sans-serif;
+  font-size: 17px; line-height: 1.45;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+}
+#app { max-width: 640px; margin: 0 auto; padding: 14px 16px calc(28px + env(safe-area-inset-bottom)); }
+h1, h2, h3, .display { font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif; margin: 0; }
+button { font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; }
+button:focus-visible, .opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+svg { display: block; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- shared bits ---------- */
+.topbar { display: flex; align-items: center; gap: 10px; padding: 4px 0 14px; }
+.wordmark { font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif; font-weight: 800; font-size: 26px; letter-spacing: .06em; }
+.wordmark .o { color: var(--accent); }
+.spacer { flex: 1; }
+.iconbtn { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); }
+.iconbtn svg { width: 20px; height: 20px; stroke: var(--ink); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.avatar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; font-weight: 700; font-size: 17px; color: #fff; border: none; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+.btn { display: block; width: 100%; text-align: center; padding: 14px 18px; border-radius: 12px; font-weight: 700; font-size: 17px; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-quiet { background: var(--panel); border: 1px solid var(--line); }
+.btn[disabled] { opacity: .45; cursor: default; }
+.caption { color: var(--muted); font-size: 14px; }
+.chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 13px; font-weight: 500; background: var(--panel2); color: var(--muted); }
+
+/* ---------- home ---------- */
+.hero { padding: 16px 18px; margin-bottom: 14px; }
+.hero .greet { font-size: 30px; font-weight: 800; letter-spacing: .02em; text-wrap: balance; }
+.rankline { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
+.rank { color: var(--brass); font-weight: 700; }
+.xpbar { height: 6px; border-radius: 3px; background: var(--panel2); margin-top: 10px; overflow: hidden; }
+.xpbar > div { height: 100%; border-radius: 3px; background: var(--brass); }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: var(--panel2); padding: 4px; border-radius: 12px; margin: 0 0 14px; }
+.seg button { padding: 9px 4px; border-radius: 9px; font-weight: 700; font-size: 14.5px; color: var(--muted); }
+.seg button.on { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mode { text-align: left; padding: 14px; display: flex; flex-direction: column; gap: 8px; min-height: 108px; }
+.mode.wide { grid-column: 1 / -1; flex-direction: row; align-items: center; min-height: 0; }
+.mode .glyph { width: 26px; height: 26px; }
+.mode .glyph svg { width: 100%; height: 100%; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mode .mname { font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: .03em; }
+.mode .mdesc { color: var(--muted); font-size: 13.5px; line-height: 1.3; }
+.mode .acc { margin-top: auto; }
+.syncline { display: flex; align-items: center; gap: 7px; justify-content: center; margin-top: 18px; color: var(--muted); font-size: 13.5px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.dot.ok { background: var(--good); }
+.dot.warn { background: var(--brass); }
+
+/* ---------- round ---------- */
+.roundbar { display: flex; align-items: center; gap: 12px; padding: 2px 0 12px; }
+.dots { display: flex; gap: 5px; flex: 1; justify-content: center; }
+.dots span { width: 9px; height: 9px; border-radius: 50%; background: var(--panel2); border: 1px solid var(--line); }
+.dots span.cur { border-color: var(--accent); }
+.dots span.good { background: var(--good); border-color: var(--good); }
+.dots span.bad { background: var(--bad); border-color: var(--bad); }
+.streak { min-width: 44px; text-align: right; color: var(--brass); font-weight: 700; }
+.prompt { text-align: center; margin: 6px 0 14px; }
+.prompt h2 { font-size: 26px; font-weight: 700; letter-spacing: .02em; text-wrap: balance; }
+.prompt .sub { color: var(--muted); font-size: 14.5px; margin-top: 2px; }
+.bigflag { font-size: 92px; line-height: 1.15; text-align: center; margin: 2px 0 6px;
+  filter: drop-shadow(0 2px 6px rgba(34,48,58,.25)); }
+.shapebox { width: min(64vw, 240px); margin: 0 auto 8px; }
+.shapebox svg { width: 100%; height: auto; }
+.shapebox path { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.opts { display: grid; gap: 9px; }
+.opt { text-align: left; padding: 13px 16px; border-radius: 12px; background: var(--panel); border: 1.5px solid var(--line); font-size: 17px; font-weight: 500; }
+.opt .flg { margin-right: 8px; }
+.opt.good { background: var(--good-soft); border-color: var(--good); }
+.opt.bad { background: var(--bad-soft); border-color: var(--bad); }
+.opt.dim { opacity: .55; }
+.factbox { margin-top: 12px; padding: 11px 14px; border-left: 3px solid var(--brass); background: var(--panel); border-radius: 0 10px 10px 0; font-size: 15px; }
+.nextbar { position: sticky; bottom: 10px; margin-top: 14px; }
+.map-wrap { touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); }
+.map-wrap svg { width: 100%; height: auto; }
+.wmap path { fill: var(--land); stroke: var(--land-line); stroke-width: .7; }
+.wmap path.sel { fill: var(--accent); }
+.wmap path.hit { fill: var(--good); }
+.wmap path.miss { fill: var(--bad); }
+.zoomctl { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+.zoomctl button { width: 38px; height: 38px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 21px; font-weight: 700; box-shadow: var(--shadow); }
+.maparea { position: relative; }
+.minimap { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--panel); margin: 0 0 12px; }
+.minimap svg { width: 100%; height: auto; }
+.minimap path { fill: var(--land); stroke: var(--land-line); stroke-width: .5; }
+.mk { fill: var(--bad); stroke: #fff; stroke-width: 1.2; }
+.mk-ring { fill: none; stroke: var(--bad); }
+
+/* ---------- summary & stats ---------- */
+.bignum { font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif; font-weight: 800; font-size: 64px; line-height: 1; }
+.sumhead { text-align: center; padding: 24px 16px 18px; margin-bottom: 14px; }
+.sumstats { display: flex; justify-content: center; gap: 26px; margin-top: 12px; }
+.sumstats .lab { color: var(--muted); font-size: 13px; }
+.misslist { margin: 0 0 14px; padding: 4px 16px; }
+.missrow { display: flex; gap: 10px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 15.5px; }
+.missrow:last-child { border-bottom: none; }
+.missrow .wrong { color: var(--bad); text-decoration: line-through; }
+.missrow .right { color: var(--good); font-weight: 700; }
+.statgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.tile { padding: 12px 14px; }
+.tile .lab { color: var(--muted); font-size: 13px; }
+.tile .val { font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif; font-weight: 800; font-size: 30px; }
+.meterrow { display: grid; grid-template-columns: 92px 1fr 52px; align-items: center; gap: 10px; padding: 7px 0; }
+.meterrow .lab { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meter { height: 8px; border-radius: 4px; background: var(--panel2); overflow: hidden; }
+.meter > div { height: 100%; border-radius: 4px; background: var(--accent); }
+.meterrow .pct { text-align: right; font-size: 14px; color: var(--muted); }
+.sect { margin: 18px 0 8px; font-size: 20px; font-weight: 700; letter-spacing: .04em; }
+.panelpad { padding: 8px 16px; }
+.h2h { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; padding: 14px 16px; }
+.h2h .side { text-align: center; }
+.h2h .vs { color: var(--muted); font-weight: 700; }
+.trouble { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.trouble:last-child { border-bottom: none; }
+
+/* ---------- profiles ---------- */
+.profwrap { padding-top: 8vh; text-align: center; }
+.profwrap h1 { font-size: 42px; font-weight: 800; letter-spacing: .04em; }
+.plist { display: grid; gap: 10px; margin: 22px 0 16px; }
+.prow { display: flex; align-items: center; gap: 12px; padding: 12px 16px; font-size: 18px; font-weight: 700; }
+.newprof { display: flex; gap: 8px; margin-top: 8px; }
+.newprof input { flex: 1; font: inherit; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--panel); color: var(--ink); min-width: 0; }
+.newprof button { flex-shrink: 0; width: auto; padding: 12px 18px; }
+
+@keyframes pop { 0% { transform: scale(.96); } 60% { transform: scale(1.02); } 100% { transform: scale(1); } }
+.pop { animation: pop .18s ease-out; }
+@media (prefers-reduced-motion: reduce) { .pop { animation: none; } }
+</style>
+
+<div id="app"></div>
+
+<script id="gg-state" type="application/json">{"v":1,"players":{}}</script>
+<script id="gg-geodata" type="application/json">"__GEODATA__"</script>
+<script id="gg-curated" type="application/json">"__CURATED__"</script>
+
+<script id="gg-main">
+'use strict';
+/* ================= data ================= */
+const GEO = JSON.parse(document.getElementById('gg-geodata').textContent);
+const CUR = JSON.parse(document.getElementById('gg-curated').textContent);
+const PROJ = GEO.proj;
+
+function project(lat, lon) {
+  const la = lon * Math.PI / 180, phi = lat * Math.PI / 180;
+  const p2 = phi * phi, p4 = p2 * p2;
+  const x = la * (0.8707 - 0.131979 * p2 + p4 * (-0.013791 + p4 * (0.003971 * p2 - 0.001529 * p4)));
+  const y = phi * (1.007226 + p2 * (0.015085 + p4 * (-0.044475 + 0.028874 * p2 - 0.005916 * p4)));
+  return [PROJ.tx + PROJ.k * x, PROJ.ty - PROJ.k * y];
+}
+
+const QUIZ = GEO.countries.filter(c => c.a2 && !CUR.excluded.includes(c.a2));
+const byA2 = {};
+for (const c of QUIZ) byA2[c.a2] = c;
+// countries referenced by cities but too small for the 110m map
+const EXTRA = { SG: { a2: 'SG', name: 'Singapore', region: 'Asia', subregion: 'South-Eastern Asia', flag: '\u{1F1F8}\u{1F1EC}' } };
+const cinfo = a2 => byA2[a2] || EXTRA[a2];
+const tierOf = a2 => CUR.tier1.includes(a2) ? 1 : CUR.tier3.includes(a2) ? 3 : 2;
+const TMULT = { 1: 1, 2: 1.5, 3: 2 };
+
+const CITIES = CUR.cities.map(([name, a2, tier, lat, lon]) => ({ name, a2, tier, ll: [lat, lon] }));
+const FEATS = CUR.features.map(([name, type, tier, lat, lon, fact]) => ({ name, type, tier, ll: [lat, lon], fact }));
+const FTYPE = { river: 'River', desert: 'Desert', mountain: 'Peaks & ranges', lake: 'Lake', sea: 'Seas & straits' };
+
+const MAP_PATHS = GEO.countries.map(c =>
+  '<path d="' + c.map + '"' + (c.a2 ? ' data-a2="' + c.a2 + '"' : '') + '/>').join('');
+
+const RANKS = [[0,'Deckhand'],[150,'Wayfarer'],[400,'Navigator'],[900,'Pathfinder'],[1600,'Cartographer'],[2600,'Trailblazer'],[4000,'Voyager'],[6000,'Grand Explorer'],[9000,'Master of Maps']];
+const AVATAR_COLORS = ['#0E7C7B','#A8552F','#5B6C9E','#7A6A2F','#8A4E7C','#3E7C4F'];
+
+const MODES = {
+  flags:    { label: 'Flags',    desc: 'Whose flag is flying?' },
+  shapes:   { label: 'Shapes',   desc: 'Name the country by outline' },
+  capitals: { label: 'Capitals', desc: 'Both directions, no mercy' },
+  maphunt:  { label: 'Map Hunt', desc: 'Find it on the world map' },
+  cities:   { label: 'Cities',   desc: 'Place the city in its country' },
+  nature:   { label: 'Nature',   desc: 'Rivers, deserts, peaks, seas' },
+  review:   { label: 'Review misses', desc: 'Retry what got away' },
+};
+const GLYPHS = {
+  flags: '<path d="M5 21V4m0 0h11l-2.6 3.5L16 11H5"/>',
+  shapes: '<path d="M12 3l7.5 4.5-1 6.5-5 6.5-8-2.5-2-7.5z"/>',
+  capitals: '<path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.2 6L12 16.8 6.5 19.6l1.2-6L3.2 9.4l6.1-.8z"/>',
+  maphunt: '<circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/>',
+  cities: '<path d="M3 21V11h4.5v10M9.5 21V4H15v17M17 21v-7.5h4V21M2 21h20"/>',
+  nature: '<path d="M2 20l6.5-11 4 6.5L15.5 11l6.5 9z"/>',
+  review: '<path d="M20 12a8 8 0 1 1-2.4-5.7M20 2.5V7h-4.5"/>',
+  stats: '<path d="M4 20v-8M10 20V5M16 20v-11M2 20h20"/>',
+};
+
+/* ================= state & sync ================= */
+const LS = { state: 'gg:state', profile: 'gg:profile', diff: 'gg:diff' };
+function loadLocal() {
+  try { const s = localStorage.getItem(LS.state); return s ? JSON.parse(s) : { v: 1, players: {} }; }
+  catch (e) { return { v: 1, players: {} }; }
+}
+function lsGet(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function mergeStates(a, b) {
+  const out = { v: 1, players: {} };
+  const names = new Set([...Object.keys(a.players || {}), ...Object.keys(b.players || {})]);
+  for (const n of names) {
+    const pa = (a.players || {})[n], pb = (b.players || {})[n];
+    out.players[n] = !pa ? pb : !pb ? pa : ((pb.updatedAt || 0) > (pa.updatedAt || 0) ? pb : pa);
+  }
+  return out;
+}
+
+let EMBED = { v: 1, players: {} };
+try { EMBED = JSON.parse(document.getElementById('gg-state').textContent); } catch (e) {}
+let state = mergeStates(EMBED, loadLocal());
+function saveLocal() {
+  state.v = 1;
+  lsSet(LS.state, JSON.stringify(state));
+}
+saveLocal();
+
+let artifactNS = null;
+let syncStatus = 'checking'; // checking | synced | device | error
+const canUse = typeof window.claude === 'object' && window.claude && typeof window.claude.use === 'function';
+if (canUse) {
+  window.claude.use('artifact').then(ns => {
+    artifactNS = ns;
+    syncStatus = ns ? 'synced' : 'device';
+    updateSyncUI();
+  }).catch(() => { syncStatus = 'device'; updateSyncUI(); });
+} else { syncStatus = 'device'; }
+
+function buildDocument() {
+  const g = id => document.getElementById(id).textContent;
+  const esc = s => s.replace(/</g, '\\u003c');
+  const stateJson = esc(JSON.stringify(state));
+  const SC = '<\/script>';
+  return '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' +
+    '<title>Globetrot<\/title>' +
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">' +
+    '<style id="gg-css">' + document.getElementById('gg-css').textContent + '<\/style>' +
+    '</head><body><div id="app"></div>' +
+    '<script id="gg-state" type="application/json">' + stateJson + SC +
+    '<script id="gg-geodata" type="application/json">' + g('gg-geodata') + SC +
+    '<script id="gg-curated" type="application/json">' + g('gg-curated') + SC +
+    '<script id="gg-main">' + g('gg-main') + SC +
+    '</body></html>';
+}
+
+let publishing = false;
+async function publishShared() {
+  if (!artifactNS || publishing) { updateSyncUI(); return; }
+  publishing = true;
+  try {
+    await artifactNS.publish(buildDocument());
+    syncStatus = 'synced';
+  } catch (e) {
+    // conflict → the view reloads to the winner and local storage re-merges;
+    // not_granted / not_writer → this viewer can't write the shared copy.
+    if (!e || e.code !== 'conflict') syncStatus = 'device';
+  }
+  publishing = false;
+  updateSyncUI();
+}
+
+/* ================= player helpers ================= */
+let profile = lsGet(LS.profile, '');
+function player() { return state.players[profile]; }
+function ensurePlayer(name) {
+  if (!state.players[name]) {
+    const used = Object.values(state.players).map(p => p.color);
+    const color = AVATAR_COLORS.find(c => !used.includes(c)) || AVATAR_COLORS[Object.keys(state.players).length % AVATAR_COLORS.length];
+    state.players[name] = { color, created: Date.now(), updatedAt: Date.now(), xp: 0, bestStreak: 0, rounds: [], items: {} };
+  }
+  return state.players[name];
+}
+function rankFor(xp) {
+  let i = 0;
+  while (i + 1 < RANKS.length && xp >= RANKS[i + 1][0]) i++;
+  const cur = RANKS[i], next = RANKS[i + 1];
+  return { name: cur[1], progress: next ? (xp - cur[0]) / (next[0] - cur[0]) : 1, next: next ? next[0] - xp : 0 };
+}
+function itemStat(p, key) { return p.items[key] || { r: 0, w: 0, last: 0 }; }
+function accuracy(p, prefix) {
+  let r = 0, w = 0;
+  for (const k in p.items) {
+    if (!prefix || k.startsWith(prefix)) { r += p.items[k].r; w += p.items[k].w; }
+  }
+  return { r, w, n: r + w, pct: r + w ? Math.round(100 * r / (r + w)) : null };
+}
+
+/* ================= question engine ================= */
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function sample(a, n) { return shuffle(a.slice()).slice(0, n); }
+
+function tiersFor(diff) {
+  if (diff === 'easy') return { 1: 1 };
+  if (diff === 'medium') return { 1: .4, 2: 1 };
+  if (diff === 'hard') return { 2: .5, 3: 1 };
+  return { 1: .7, 2: 1, 3: .8 }; // mixed
+}
+function pickWeighted(cands, n, p, keyFn, tierFn, diff) {
+  const tw = tiersFor(diff);
+  const scored = cands.map(c => {
+    const t = tierFn(c);
+    if (!tw[t]) return null;
+    const st = itemStat(p, keyFn(c));
+    const seen = st.r + st.w;
+    const wrongRatio = seen ? st.w / seen : 0;
+    let w = tw[t] * (1 + 2.2 * wrongRatio) * (seen ? 1 : 1.5);
+    return { c, w };
+  }).filter(Boolean);
+  const out = [];
+  while (out.length < n && scored.length) {
+    let total = 0; for (const s of scored) total += s.w;
+    let r = Math.random() * total, idx = 0;
+    for (; idx < scored.length - 1; idx++) { r -= scored[idx].w; if (r <= 0) break; }
+    out.push(scored[idx].c); scored.splice(idx, 1);
+  }
+  return out;
+}
+
+function countryDistractors(ans, pool, n, diff) {
+  const same = pool.filter(c => c.a2 !== ans.a2);
+  const bySub = same.filter(c => c.subregion === ans.subregion);
+  const byReg = same.filter(c => c.region === ans.region && c.subregion !== ans.subregion);
+  const rest = same.filter(c => c.region !== ans.region);
+  const near = diff === 'easy' ? [...byReg, ...bySub] : [...bySub, ...byReg];
+  const picked = sample(near, n);
+  while (picked.length < n && rest.length) picked.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]);
+  return picked;
+}
+
+function mkOptions(correctLabel, distractorLabels) {
+  const opts = shuffle([correctLabel, ...distractorLabels]);
+  return { opts, answer: opts.indexOf(correctLabel) };
+}
+
+function questionFor(mode, item, diff) {
+  const P = QUIZ;
+  if (mode === 'flags') {
+    const d = countryDistractors(item, P.filter(c => c.flag), 3, diff);
+    const { opts, answer } = mkOptions(item.name, d.map(c => c.name));
+    return { mode, key: 'flags:' + item.a2, tier: tierOf(item.a2), prompt: 'Whose flag is this?', visual: { flag: item.flag }, opts, answer, revealA2: item.a2 };
+  }
+  if (mode === 'shapes') {
+    const d = countryDistractors(item, P, 3, diff);
+    const { opts, answer } = mkOptions(item.name, d.map(c => c.name));
+    return { mode, key: 'shapes:' + item.a2, tier: tierOf(item.a2), prompt: 'Which country is this?', visual: { shape: item.shape }, opts, answer, revealA2: item.a2 };
+  }
+  if (mode === 'capitals') {
+    const pool = P.filter(c => c.capital);
+    const d = countryDistractors(item, pool, 3, diff);
+    if (Math.random() < 0.5) {
+      const { opts, answer } = mkOptions(item.capital, d.map(c => c.capital));
+      return { mode, key: 'capitals:' + item.a2, tier: tierOf(item.a2), prompt: 'What is the capital of ' + item.name + '?', opts, answer };
+    }
+    const { opts, answer } = mkOptions(item.name, d.map(c => c.name));
+    return { mode, key: 'capitals:' + item.a2, tier: tierOf(item.a2), prompt: item.capital + ' is the capital of…', opts, answer, optFlags: opts.map(n => (P.find(c => c.name === n) || {}).flag || '') };
+  }
+  if (mode === 'maphunt') {
+    return { mode, key: 'maphunt:' + item.a2, tier: tierOf(item.a2), prompt: 'Find ' + item.name, sub: item.subregion, targetA2: item.a2 };
+  }
+  if (mode === 'cities') {
+    const ansInfo = cinfo(item.a2);
+    const pool = P.concat(Object.values(EXTRA));
+    const d = countryDistractors(ansInfo, pool, 3, diff);
+    const { opts, answer } = mkOptions(ansInfo.name, d.map(c => c.name));
+    return { mode, key: 'cities:' + item.name, tier: item.tier, prompt: 'Which country is ' + item.name + ' in?', opts, answer, revealLL: item.ll, revealLabel: item.name, optFlags: opts.map(n => { const c = pool.find(x => x.name === n); return c ? c.flag : ''; }) };
+  }
+  if (mode === 'nature') {
+    // keep distractors geographically distinct so a neighboring feature isn't "also right"
+    const far = f => Math.hypot(f.ll[0] - item.ll[0], f.ll[1] - item.ll[1]) > 7;
+    const d = sample(FEATS.filter(f => f.type === item.type && f.name !== item.name && far(f)), 3);
+    const { opts, answer } = mkOptions(item.name, d.map(f => f.name));
+    return { mode, key: 'nature:' + item.name, tier: item.tier, prompt: 'Name this ' + (item.type === 'sea' ? 'body of water' : item.type === 'mountain' ? 'mountain or range' : item.type), sub: FTYPE[item.type], visual: { markerLL: item.ll, zoom: 2.6 }, opts, answer, fact: item.fact };
+  }
+}
+
+function buildRound(mode, diff, p) {
+  const N = 10;
+  let qs = [];
+  if (mode === 'review') {
+    const missed = Object.keys(p.items).filter(k => p.items[k].w > 0 && !k.startsWith('maphunt'))
+      .sort((a, b) => (p.items[b].w / (p.items[b].r + p.items[b].w)) - (p.items[a].w / (p.items[a].r + p.items[a].w)));
+    for (const k of sample(missed, Math.min(N, missed.length))) {
+      const [m, id] = [k.slice(0, k.indexOf(':')), k.slice(k.indexOf(':') + 1)];
+      let item = null;
+      if (m === 'cities') item = CITIES.find(c => c.name === id);
+      else if (m === 'nature') item = FEATS.find(f => f.name === id);
+      else item = byA2[id];
+      if (item) { const q = questionFor(m, item, 'mixed'); if (q) qs.push(q); }
+    }
+    // top up with fresh mixed questions if few misses
+    if (qs.length < 5) {
+      const extra = buildRound('flags', 'mixed', p).qs.slice(0, N - qs.length);
+      qs = qs.concat(extra);
+    }
+    return { mode, diff: 'mixed', qs: shuffle(qs).slice(0, N) };
+  }
+  if (mode === 'cities') {
+    const items = pickWeighted(CITIES, N, p, c => 'cities:' + c.name, c => c.tier, diff);
+    qs = items.map(i => questionFor(mode, i, diff));
+  } else if (mode === 'nature') {
+    const items = pickWeighted(FEATS, N, p, f => 'nature:' + f.name, f => f.tier, diff);
+    qs = items.map(i => questionFor(mode, i, diff));
+  } else {
+    let pool = QUIZ;
+    if (mode === 'flags') pool = pool.filter(c => c.flag && c.a2 !== 'XK'); // XK flag emoji doesn't render on iOS
+    if (mode === 'capitals') pool = pool.filter(c => c.capital);
+    const items = pickWeighted(pool, N, p, c => mode + ':' + c.a2, c => tierOf(c.a2), diff);
+    qs = items.map(i => questionFor(mode, i, diff));
+  }
+  return { mode, diff, qs };
+}
+
+/* ================= rendering ================= */
+const app = document.getElementById('app');
+const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+let screen = 'home';
+let round = null; // {mode,diff,qs,i,score,streak,bestStreak,xp,misses[],answered,selA2}
+const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function glyph(name) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + GLYPHS[name] + '</svg>'; }
+
+function worldSvg(vb, extra, cls) {
+  return '<svg class="wmap ' + (cls || '') + '" viewBox="' + vb.join(' ') + '" preserveAspectRatio="xMidYMid meet">' +
+    '<g id="gg-countries">' + MAP_PATHS + '</g>' + (extra || '') + '</svg>';
+}
+function markerSvg(ll, vbw, label) {
+  const [x, y] = project(ll[0], ll[1]);
+  const r = Math.max(3, vbw * 0.011);
+  const pulse = reducedMotion ? '' :
+    '<circle class="mk-ring" cx="' + x + '" cy="' + y + '" r="' + r + '" stroke-width="' + (r * 0.4) + '">' +
+    '<animate attributeName="r" values="' + r + ';' + (r * 2.6) + '" dur="1.6s" repeatCount="indefinite"/>' +
+    '<animate attributeName="opacity" values=".8;0" dur="1.6s" repeatCount="indefinite"/></circle>';
+  return pulse + '<circle class="mk" cx="' + x + '" cy="' + y + '" r="' + r + '"/>';
+}
+function zoomedVb(ll, zoom) {
+  const [x, y] = project(ll[0], ll[1]);
+  const w = 1000 / zoom, h = 520 / zoom;
+  return [Math.min(Math.max(x - w / 2, -40), 1040 - w), Math.min(Math.max(y - h / 2, -30), 550 - h), w, h];
+}
+
+function updateSyncUI() {
+  const el = document.getElementById('syncline');
+  if (!el) return;
+  el.innerHTML = syncHtml();
+}
+function syncHtml() {
+  const map = {
+    checking: ['dot', 'Checking sync…'],
+    synced: ['dot ok', 'Progress syncs across your devices'],
+    device: ['dot warn', 'Progress saved on this device only'],
+  };
+  const [cls, txt] = map[syncStatus] || map.device;
+  return '<span class="' + cls + '"></span><span>' + txt + '</span>';
+}
+
+/* ---------- screens ---------- */
+function render() {
+  if (!profile || !state.players[profile]) { renderProfiles(); return; }
+  if (screen === 'home') renderHome();
+  else if (screen === 'round') renderRound();
+  else if (screen === 'summary') renderSummary();
+  else if (screen === 'stats') renderStats();
+}
+
+function renderProfiles() {
+  const rows = Object.entries(state.players).map(([name, p]) =>
+    '<button class="card prow" data-act="pick-prof" data-name="' + escHtml(name) + '">' +
+    '<span class="avatar" style="background:' + p.color + '">' + escHtml(name[0].toUpperCase()) + '</span>' +
+    '<span>' + escHtml(name) + '</span><span class="spacer"></span>' +
+    '<span class="chip num">' + p.xp + ' xp</span></button>').join('');
+  app.innerHTML =
+    '<div class="profwrap">' +
+    '<div class="wordmark" style="font-size:40px">GL<span class="o">O</span>BETROT</div>' +
+    '<p class="caption" style="margin-top:2px">The world, ten questions at a time.</p>' +
+    '<div class="plist">' + rows + '</div>' +
+    '<form class="newprof" data-act="new-prof">' +
+    '<input name="pname" placeholder="' + (rows ? 'Add an explorer…' : 'Your name…') + '" maxlength="20" autocomplete="off">' +
+    '<button class="btn btn-primary" type="submit">Start</button></form>' +
+    '<p class="caption" style="margin-top:26px">Play on any phone or tablet — each explorer keeps their own progress.</p>' +
+    '<div class="syncline" id="syncline">' + syncHtml() + '</div>' +
+    '</div>';
+}
+
+function renderHome() {
+  const p = player();
+  const rk = rankFor(p.xp);
+  const diff = lsGet(LS.diff, 'easy');
+  const acc = accuracy(p, '');
+  const missCount = Object.values(p.items).reduce((s, it) => s + (it.w > 0 ? 1 : 0), 0);
+  const modeCard = (m, wide) => {
+    const a = accuracy(p, m + ':');
+    return '<button class="card mode' + (wide ? ' wide' : '') + '" data-act="start" data-mode="' + m + '">' +
+      '<span class="glyph">' + glyph(m) + '</span>' +
+      '<span><span class="mname">' + MODES[m].label + '</span><br><span class="mdesc">' + MODES[m].desc + '</span></span>' +
+      (a.n ? '<span class="acc chip num">' + a.pct + '% · ' + a.n + '</span>' : '') +
+      '</button>';
+  };
+  app.innerHTML =
+    '<div class="topbar">' +
+    '<span class="wordmark">GL<span class="o">O</span>BETROT</span><span class="spacer"></span>' +
+    '<button class="iconbtn" data-act="stats" aria-label="Statistics">' + glyph('stats') + '</button>' +
+    '<button class="avatar" data-act="switch-prof" style="background:' + p.color + '" aria-label="Switch player">' + escHtml(profile[0].toUpperCase()) + '</button>' +
+    '</div>' +
+    '<div class="card hero">' +
+    '<div class="greet">Where to today, ' + escHtml(profile) + '?</div>' +
+    '<div class="rankline"><span class="rank">' + rk.name + '</span>' +
+    '<span class="caption num">' + p.xp + ' xp' + (rk.next ? ' · ' + rk.next + ' to next rank' : '') + '</span>' +
+    (acc.n ? '<span class="spacer"></span><span class="caption num">' + acc.pct + '% lifetime</span>' : '') + '</div>' +
+    '<div class="xpbar"><div style="width:' + Math.round(rk.progress * 100) + '%"></div></div>' +
+    '</div>' +
+    '<div class="seg">' + ['easy', 'medium', 'hard', 'mixed'].map(d =>
+      '<button data-act="diff" data-diff="' + d + '" class="' + (d === diff ? 'on' : '') + '">' + d[0].toUpperCase() + d.slice(1) + '</button>').join('') + '</div>' +
+    '<div class="modes">' +
+    modeCard('flags') + modeCard('shapes') + modeCard('capitals') + modeCard('maphunt') + modeCard('cities') + modeCard('nature') +
+    (missCount >= 5 ? modeCard('review', true) : '') +
+    '</div>' +
+    '<div class="syncline" id="syncline">' + syncHtml() + '</div>';
+}
+
+function startRound(mode) {
+  const diff = lsGet(LS.diff, 'easy');
+  round = buildRound(mode, diff, player());
+  if (!round.qs.length) { round = null; return; }
+  round.i = 0; round.score = 0; round.streak = 0; round.bestStreak = 0; round.xp = 0;
+  round.misses = []; round.answered = false; round.selA2 = null;
+  screen = 'round';
+  render();
+}
+
+function renderRound() {
+  const q = round.qs[round.i];
+  const dots = round.qs.map((_, i) => {
+    let cls = '';
+    if (i < round.i || (i === round.i && round.answered)) cls = round.results && round.results[i] ? 'good' : 'bad';
+    else if (i === round.i) cls = 'cur';
+    return '<span class="' + cls + '"></span>';
+  }).join('');
+  let body = '';
+  if (q.mode === 'maphunt') body = maphuntBody(q);
+  else body = choiceBody(q);
+  app.innerHTML =
+    '<div class="roundbar">' +
+    '<button class="iconbtn" data-act="quit" aria-label="Quit round"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+    '<div class="dots">' + dots + '</div>' +
+    '<div class="streak num">' + (round.streak >= 2 ? '✦ ' + round.streak : '') + '</div>' +
+    '</div>' + body;
+  if (q.mode === 'maphunt') initMapInteraction();
+}
+
+function choiceBody(q) {
+  let visual = '';
+  if (q.visual && q.visual.flag) visual = '<div class="bigflag">' + q.visual.flag + '</div>';
+  else if (q.visual && q.visual.shape) visual = '<div class="shapebox"><svg viewBox="0 0 200 200"><path d="' + q.visual.shape + '"/></svg></div>';
+  else if (q.visual && q.visual.markerLL) {
+    const vb = zoomedVb(q.visual.markerLL, q.visual.zoom || 2.6);
+    visual = '<div class="minimap"><svg viewBox="' + vb.join(' ') + '"><g>' + MAP_PATHS + '</g>' + markerSvg(q.visual.markerLL, vb[2]) + '</svg></div>';
+  }
+  const opts = q.opts.map((o, i) =>
+    '<button class="opt" data-act="answer" data-i="' + i + '">' +
+    (q.optFlags && q.optFlags[i] ? '<span class="flg">' + q.optFlags[i] + '</span>' : '') +
+    escHtml(o) + '</button>').join('');
+  return visual +
+    '<div class="prompt"><h2>' + escHtml(q.prompt) + '</h2>' + (q.sub ? '<div class="sub">' + escHtml(q.sub) + '</div>' : '') + '</div>' +
+    '<div class="opts">' + opts + '</div>' +
+    '<div id="feedback"></div>' +
+    '<div class="nextbar" id="nextbar"></div>';
+}
+
+function maphuntBody(q) {
+  return '<div class="prompt"><h2>' + escHtml(q.prompt) + '</h2>' +
+    '<div class="sub">Drag to pan · pinch or buttons to zoom · tap to choose</div></div>' +
+    '<div class="maparea"><div class="map-wrap" id="mapwrap">' + worldSvg([0, 0, 1000, 520]) + '</div>' +
+    '<div class="zoomctl"><button data-act="zoom" data-z="in" aria-label="Zoom in">+</button><button data-act="zoom" data-z="out" aria-label="Zoom out">−</button></div></div>' +
+    '<div class="nextbar" id="nextbar"><button class="btn btn-primary" id="confirmbtn" data-act="confirm-map" disabled>Tap a country</button></div>';
+}
+
+/* map pan/zoom/tap */
+let mapVb = null;
+function applyVb() {
+  const svg = document.querySelector('#mapwrap svg');
+  if (svg) svg.setAttribute('viewBox', mapVb.map(v => Math.round(v * 10) / 10).join(' '));
+}
+function zoomAt(cx, cy, factor) {
+  const [x, y, w, h] = mapVb;
+  const nw = Math.min(1100, Math.max(34, w * factor));
+  const nh = nw * 0.52;
+  const fx = (cx - x) / w, fy = (cy - y) / h;
+  mapVb = [cx - fx * nw, cy - fy * nh, nw, nh];
+  applyVb();
+}
+function initMapInteraction() {
+  mapVb = [0, 0, 1000, 520];
+  const wrap = document.getElementById('mapwrap');
+  const svg = wrap.querySelector('svg');
+  const ptrs = new Map();
+  let moved = false, downAt = 0, pinchD = 0;
+  const toSvg = (px, py) => {
+    const r = svg.getBoundingClientRect();
+    return [mapVb[0] + (px - r.left) / r.width * mapVb[2], mapVb[1] + (py - r.top) / r.height * mapVb[3]];
+  };
+  wrap.addEventListener('pointerdown', e => {
+    wrap.setPointerCapture(e.pointerId);
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size === 1) { moved = false; downAt = Date.now(); }
+    if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()];
+      pinchD = Math.hypot(a.x - b.x, a.y - b.y);
+    }
+  });
+  wrap.addEventListener('pointermove', e => {
+    if (!ptrs.has(e.pointerId)) return;
+    const prev = ptrs.get(e.pointerId);
+    const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+    const r = svg.getBoundingClientRect();
+    if (ptrs.size === 1) {
+      mapVb[0] -= dx / r.width * mapVb[2];
+      mapVb[1] -= dy / r.height * mapVb[3];
+      mapVb[0] = Math.min(Math.max(mapVb[0], -220), 1220 - mapVb[2]);
+      mapVb[1] = Math.min(Math.max(mapVb[1], -160), 680 - mapVb[3]);
+      applyVb();
+    } else if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchD > 0 && d > 0) {
+        const [cx, cy] = toSvg((a.x + b.x) / 2, (a.y + b.y) / 2);
+        zoomAt(cx, cy, pinchD / d);
+        pinchD = d;
+      }
+    }
+  });
+  const up = e => {
+    const wasTap = ptrs.size === 1 && !moved && Date.now() - downAt < 600;
+    ptrs.delete(e.pointerId);
+    pinchD = 0;
+    if (wasTap && !round.answered) {
+      const t = e.target.closest && e.target.closest('path[data-a2]');
+      if (t) selectCountry(t.getAttribute('data-a2'));
+    }
+  };
+  wrap.addEventListener('pointerup', up);
+  wrap.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); pinchD = 0; });
+}
+function selectCountry(a2) {
+  round.selA2 = a2;
+  document.querySelectorAll('#mapwrap path.sel').forEach(el => el.classList.remove('sel'));
+  const el = document.querySelector('#mapwrap path[data-a2="' + a2 + '"]');
+  if (el) el.classList.add('sel');
+  const btn = document.getElementById('confirmbtn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Confirm answer'; }
+}
+
+/* answers */
+function recordAnswer(q, correct) {
+  const p = player();
+  const st = p.items[q.key] || (p.items[q.key] = { r: 0, w: 0, last: 0 });
+  correct ? st.r++ : st.w++;
+  st.last = Date.now();
+  round.results = round.results || [];
+  round.results[round.i] = correct;
+  round.answered = true;
+  if (correct) {
+    round.score++;
+    round.streak++;
+    round.bestStreak = Math.max(round.bestStreak, round.streak);
+    let gain = Math.round(10 * (TMULT[q.tier] || 1));
+    if (round.streak >= 3) gain += 5;
+    round.xp += gain;
+    p.xp += gain;
+  } else {
+    round.streak = 0;
+  }
+  p.bestStreak = Math.max(p.bestStreak || 0, round.bestStreak);
+  p.updatedAt = Date.now();
+  saveLocal();
+}
+
+function answerChoice(i) {
+  const q = round.qs[round.i];
+  if (round.answered) return;
+  const correct = i === q.answer;
+  recordAnswer(q, correct);
+  if (!correct) round.misses.push({ q, picked: q.opts[i] });
+  document.querySelectorAll('.opt').forEach((el, j) => {
+    if (j === q.answer) el.classList.add('good', 'pop');
+    else if (j === i) el.classList.add('bad');
+    else el.classList.add('dim');
+    el.disabled = true;
+  });
+  const fb = document.getElementById('feedback');
+  let extra = '';
+  if (q.fact) extra = '<div class="factbox">' + escHtml(q.fact) + '</div>';
+  else if (q.revealLL) {
+    const vb = zoomedVb(q.revealLL, 3.2);
+    extra = '<div class="minimap" style="margin-top:12px"><svg viewBox="' + vb.join(' ') + '"><g>' + MAP_PATHS + '</g>' + markerSvg(q.revealLL, vb[2]) + '</svg></div>';
+  }
+  if (fb) fb.innerHTML = extra;
+  const nb = document.getElementById('nextbar');
+  if (nb) nb.innerHTML = '<button class="btn btn-primary" data-act="next">' + (round.i + 1 < round.qs.length ? 'Continue' : 'See results') + '</button>';
+  const dotEls = document.querySelectorAll('.dots span');
+  if (dotEls[round.i]) { dotEls[round.i].className = correct ? 'good' : 'bad'; }
+  const st = document.querySelector('.streak');
+  if (st) st.textContent = round.streak >= 2 ? '✦ ' + round.streak : '';
+}
+
+function confirmMap() {
+  const q = round.qs[round.i];
+  if (round.answered || !round.selA2) return;
+  const correct = round.selA2 === q.targetA2;
+  recordAnswer(q, correct);
+  if (!correct) round.misses.push({ q, picked: (byA2[round.selA2] || {}).name || 'somewhere else' });
+  const sel = document.querySelector('#mapwrap path[data-a2="' + round.selA2 + '"]');
+  const tgt = document.querySelector('#mapwrap path[data-a2="' + q.targetA2 + '"]');
+  if (sel) { sel.classList.remove('sel'); sel.classList.add(correct ? 'hit' : 'miss'); }
+  if (tgt) tgt.classList.add('hit');
+  if (!correct && byA2[q.targetA2]) {
+    const c = byA2[q.targetA2];
+    const w = Math.min(Math.max(mapVb[2], 260), 480); // zoom toward the target so it's visible
+    mapVb = [c.cx - w / 2, c.cy - w * 0.26, w, w * 0.52];
+    applyVb();
+  }
+  const nb = document.getElementById('nextbar');
+  if (nb) nb.innerHTML =
+    (correct ? '' : '<p class="caption" style="text-align:center;margin:0 0 8px">That was ' + escHtml((byA2[round.selA2] || {}).name || 'not it') + ' — ' + escHtml(byA2[q.targetA2].name) + ' is highlighted.</p>') +
+    '<button class="btn btn-primary" data-act="next">' + (round.i + 1 < round.qs.length ? 'Continue' : 'See results') + '</button>';
+  const dotEls = document.querySelectorAll('.dots span');
+  if (dotEls[round.i]) dotEls[round.i].className = correct ? 'good' : 'bad';
+}
+
+function nextQuestion() {
+  if (round.i + 1 < round.qs.length) {
+    round.i++; round.answered = false; round.selA2 = null;
+    render();
+  } else {
+    const p = player();
+    p.rounds.push({ ts: Date.now(), mode: round.mode, diff: round.diff, score: round.score, total: round.qs.length, xp: round.xp });
+    if (p.rounds.length > 300) p.rounds = p.rounds.slice(-300);
+    p.updatedAt = Date.now();
+    saveLocal();
+    screen = 'summary';
+    render();
+    publishShared();
+  }
+}
+
+function renderSummary() {
+  const total = round.qs.length;
+  const pct = Math.round(100 * round.score / total);
+  const headline = pct === 100 ? 'Flawless expedition!' : pct >= 80 ? 'Strong navigating!' : pct >= 50 ? 'Making headway.' : 'Uncharted territory.';
+  const misses = round.misses.map(m => {
+    const q = m.q;
+    const right = q.mode === 'maphunt' ? byA2[q.targetA2].name : q.opts[q.answer];
+    const pfx = q.visual && q.visual.flag ? q.visual.flag + ' ' : '';
+    return '<div class="missrow"><span style="flex:1">' + pfx + escHtml(q.prompt) + '</span>' +
+      '<span class="wrong">' + escHtml(m.picked) + '</span><span class="right">' + escHtml(right) + '</span></div>';
+  }).join('');
+  app.innerHTML =
+    '<div class="card sumhead">' +
+    '<div class="caption">' + MODES[round.mode].label + ' · ' + round.diff + '</div>' +
+    '<div class="bignum num">' + round.score + '<span style="font-size:32px;color:var(--muted)">/' + total + '</span></div>' +
+    '<h2 style="margin-top:4px">' + headline + '</h2>' +
+    '<div class="sumstats">' +
+    '<div><div class="val num" style="font-weight:800;font-size:22px;color:var(--brass)">+' + round.xp + '</div><div class="lab">xp earned</div></div>' +
+    '<div><div class="val num" style="font-weight:800;font-size:22px">' + round.bestStreak + '</div><div class="lab">best streak</div></div>' +
+    '</div></div>' +
+    (misses ? '<div class="card misslist">' + misses + '</div>' : '') +
+    '<div style="display:grid;gap:10px">' +
+    '<button class="btn btn-primary" data-act="again">Play again</button>' +
+    '<button class="btn btn-quiet" data-act="home">Back to base camp</button></div>' +
+    '<div class="syncline" id="syncline">' + syncHtml() + '</div>';
+}
+
+function meter(label, pct, count) {
+  return '<div class="meterrow"><span class="lab">' + escHtml(label) + '</span>' +
+    '<div class="meter"><div style="width:' + (pct == null ? 0 : pct) + '%"></div></div>' +
+    '<span class="pct num">' + (pct == null ? '—' : pct + '%') + '</span></div>';
+}
+
+function renderStats() {
+  const p = player();
+  const rk = rankFor(p.xp);
+  const acc = accuracy(p, '');
+  const modeRows = Object.keys(MODES).filter(m => m !== 'review').map(m => {
+    const a = accuracy(p, m + ':');
+    return meter(MODES[m].label, a.pct, a.n);
+  }).join('');
+  // region mastery from country-keyed items
+  const regions = {};
+  for (const k in p.items) {
+    const m = k.slice(0, k.indexOf(':')), id = k.slice(k.indexOf(':') + 1);
+    if (!['flags', 'shapes', 'capitals', 'maphunt'].includes(m)) continue;
+    const c = byA2[id]; if (!c) continue;
+    const r = regions[c.region] || (regions[c.region] = { r: 0, w: 0 });
+    r.r += p.items[k].r; r.w += p.items[k].w;
+  }
+  const regionRows = Object.entries(regions).sort((a, b) => (b[1].r + b[1].w) - (a[1].r + a[1].w)).map(([name, v]) =>
+    meter(name, Math.round(100 * v.r / (v.r + v.w)))).join('');
+  // trouble spots
+  const trouble = Object.entries(p.items)
+    .filter(([, v]) => v.r + v.w >= 2 && v.w / (v.r + v.w) >= 0.4)
+    .sort((a, b) => (b[1].w / (b[1].r + b[1].w)) - (a[1].w / (a[1].r + a[1].w)))
+    .slice(0, 8)
+    .map(([k, v]) => {
+      const m = k.slice(0, k.indexOf(':')), id = k.slice(k.indexOf(':') + 1);
+      const c = byA2[id];
+      const label = c ? (c.flag ? c.flag + ' ' : '') + c.name : id;
+      return '<div class="trouble"><span style="flex:1">' + escHtml(label) + '</span>' +
+        '<span class="chip">' + MODES[m].label + '</span>' +
+        '<span class="caption num">' + v.r + '/' + (v.r + v.w) + '</span></div>';
+    }).join('');
+  // head-to-head
+  const others = Object.entries(state.players).filter(([n]) => n !== profile);
+  let h2h = '';
+  if (others.length) {
+    const [oname, op] = others.sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))[0];
+    const oacc = accuracy(op, '');
+    h2h = '<div class="sect display">Head to head</div><div class="card h2h">' +
+      '<div class="side"><div class="val num" style="font-weight:800;font-size:26px">' + p.xp + '</div><div class="caption">' + escHtml(profile) + (acc.n ? ' · ' + acc.pct + '%' : '') + '</div></div>' +
+      '<div class="vs">vs</div>' +
+      '<div class="side"><div class="val num" style="font-weight:800;font-size:26px">' + op.xp + '</div><div class="caption">' + escHtml(oname) + (oacc.n ? ' · ' + oacc.pct + '%' : '') + '</div></div>' +
+      '</div>';
+  }
+  const recent = p.rounds.slice(-6).reverse().map(r =>
+    '<div class="missrow"><span style="flex:1">' + MODES[r.mode].label + ' · ' + r.diff + '</span>' +
+    '<span class="num">' + r.score + '/' + r.total + '</span>' +
+    '<span class="caption num">+' + r.xp + ' xp</span></div>').join('');
+  app.innerHTML =
+    '<div class="topbar">' +
+    '<button class="iconbtn" data-act="home" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>' +
+    '<h2 style="font-size:24px">' + escHtml(profile) + '’s logbook</h2></div>' +
+    '<div class="statgrid">' +
+    '<div class="card tile"><div class="val">' + rk.name + '</div><div class="lab num">' + p.xp + ' xp</div></div>' +
+    '<div class="card tile"><div class="val num">' + (acc.pct == null ? '—' : acc.pct + '%') + '</div><div class="lab num">accuracy · ' + acc.n + ' answered</div></div>' +
+    '<div class="card tile"><div class="val num">' + p.rounds.length + '</div><div class="lab">rounds played</div></div>' +
+    '<div class="card tile"><div class="val num">' + (p.bestStreak || 0) + '</div><div class="lab">best streak</div></div>' +
+    '</div>' +
+    h2h +
+    '<div class="sect display">By mode</div><div class="card panelpad">' + modeRows + '</div>' +
+    (regionRows ? '<div class="sect display">By region</div><div class="card panelpad">' + regionRows + '</div>' : '') +
+    (trouble ? '<div class="sect display">Trouble spots</div><div class="card panelpad">' + trouble + '</div>' : '') +
+    (recent ? '<div class="sect display">Recent rounds</div><div class="card misslist">' + recent + '</div>' : '');
+}
+
+/* ================= events ================= */
+app.addEventListener('click', e => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.getAttribute('data-act');
+  if (act === 'pick-prof') { profile = btn.getAttribute('data-name'); lsSet(LS.profile, profile); screen = 'home'; render(); }
+  else if (act === 'switch-prof') { profile = ''; lsSet(LS.profile, ''); render(); }
+  else if (act === 'diff') { lsSet(LS.diff, btn.getAttribute('data-diff')); render(); }
+  else if (act === 'start') startRound(btn.getAttribute('data-mode'));
+  else if (act === 'answer') answerChoice(Number(btn.getAttribute('data-i')));
+  else if (act === 'confirm-map') confirmMap();
+  else if (act === 'next') nextQuestion();
+  else if (act === 'again') startRound(round.mode);
+  else if (act === 'quit' || act === 'home') { screen = 'home'; round = null; render(); }
+  else if (act === 'stats') { screen = 'stats'; render(); }
+  else if (act === 'zoom') {
+    if (!mapVb) return;
+    zoomAt(mapVb[0] + mapVb[2] / 2, mapVb[1] + mapVb[3] / 2, btn.getAttribute('data-z') === 'in' ? 0.62 : 1.6);
+  }
+});
+app.addEventListener('submit', e => {
+  const f = e.target.closest('[data-act="new-prof"]');
+  if (!f) return;
+  e.preventDefault();
+  const name = f.pname.value.trim();
+  if (!name) return;
+  ensurePlayer(name);
+  profile = name;
+  lsSet(LS.profile, name);
+  saveLocal();
+  screen = 'home';
+  render();
+  publishShared();
+});
+
+render();
+</script>
