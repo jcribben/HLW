@@ -215,6 +215,7 @@ const MODES = {
   cities:   { label: 'Cities',   desc: 'Place the city in its country' },
   nature:   { label: 'Nature',   desc: 'Rivers, deserts, peaks, seas' },
   review:   { label: 'Review misses', desc: 'Retry what got away' },
+  daily:    { label: 'Daily Duel', desc: 'Same ten questions for everyone — one attempt' },
 };
 const GLYPHS = {
   flags: '<path d="M5 21V4m0 0h11l-2.6 3.5L16 11H5"/>',
@@ -224,6 +225,7 @@ const GLYPHS = {
   cities: '<path d="M3 21V11h4.5v10M9.5 21V4H15v17M17 21v-7.5h4V21M2 21h20"/>',
   nature: '<path d="M2 20l6.5-11 4 6.5L15.5 11l6.5 9z"/>',
   review: '<path d="M20 12a8 8 0 1 1-2.4-5.7M20 2.5V7h-4.5"/>',
+  daily: '<circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>',
   stats: '<path d="M4 20v-8M10 20V5M16 20v-11M2 20h20"/>',
 };
 
@@ -327,7 +329,11 @@ function accuracy(p, prefix) {
 }
 
 /* ================= question engine ================= */
-function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// rand is swappable so the Daily Duel can generate the same questions for everyone
+let rand = Math.random;
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function sample(a, n) { return shuffle(a.slice()).slice(0, n); }
 
 function tiersFor(diff) {
@@ -350,7 +356,7 @@ function pickWeighted(cands, n, p, keyFn, tierFn, diff) {
   const out = [];
   while (out.length < n && scored.length) {
     let total = 0; for (const s of scored) total += s.w;
-    let r = Math.random() * total, idx = 0;
+    let r = rand() * total, idx = 0;
     for (; idx < scored.length - 1; idx++) { r -= scored[idx].w; if (r <= 0) break; }
     out.push(scored[idx].c); scored.splice(idx, 1);
   }
@@ -364,7 +370,7 @@ function countryDistractors(ans, pool, n, diff) {
   const rest = same.filter(c => c.region !== ans.region);
   const near = diff === 'easy' ? [...byReg, ...bySub] : [...bySub, ...byReg];
   const picked = sample(near, n);
-  while (picked.length < n && rest.length) picked.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]);
+  while (picked.length < n && rest.length) picked.push(rest.splice(Math.floor(rand() * rest.length), 1)[0]);
   return picked;
 }
 
@@ -388,7 +394,7 @@ function questionFor(mode, item, diff) {
   if (mode === 'capitals') {
     const pool = P.filter(c => c.capital);
     const d = countryDistractors(item, pool, 3, diff);
-    if (Math.random() < 0.5) {
+    if (rand() < 0.5) {
       const { opts, answer } = mkOptions(item.capital, d.map(c => c.capital));
       return { mode, key: 'capitals:' + item.a2, tier: tierOf(item.a2), prompt: 'What is the capital of ' + item.name + '?', opts, answer };
     }
@@ -414,6 +420,29 @@ function questionFor(mode, item, diff) {
   }
 }
 
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function buildDailyRound() {
+  // Seeded by the date so every player gets the identical round, independent of history.
+  const saved = rand;
+  rand = mulberry32(hashStr('globetrot-daily-' + todayKey()));
+  const ghost = { items: {} };
+  const qs = [];
+  const grab = (mode, pool, n, keyFn, tierFn) => {
+    for (const item of pickWeighted(pool, n, ghost, keyFn, tierFn, 'mixed')) qs.push(questionFor(mode, item, 'mixed'));
+  };
+  grab('flags', QUIZ.filter(c => c.flag && c.a2 !== 'XK'), 2, c => 'flags:' + c.a2, c => tierOf(c.a2));
+  grab('shapes', QUIZ, 2, c => 'shapes:' + c.a2, c => tierOf(c.a2));
+  grab('capitals', QUIZ.filter(c => c.capital), 2, c => 'capitals:' + c.a2, c => tierOf(c.a2));
+  grab('cities', CITIES, 2, c => 'cities:' + c.name, c => c.tier);
+  grab('nature', FEATS, 1, f => 'nature:' + f.name, f => f.tier);
+  grab('maphunt', QUIZ, 1, c => 'maphunt:' + c.a2, c => tierOf(c.a2));
+  shuffle(qs);
+  rand = saved;
+  return { mode: 'daily', diff: 'mixed', qs };
+}
 function buildRound(mode, diff, p) {
   const N = 10;
   let qs = [];
@@ -549,6 +578,7 @@ function renderHome() {
     (acc.n ? '<span class="spacer"></span><span class="caption num">' + acc.pct + '% lifetime</span>' : '') + '</div>' +
     '<div class="xpbar"><div style="width:' + Math.round(rk.progress * 100) + '%"></div></div>' +
     '</div>' +
+    dailyCard(p) +
     '<div class="seg">' + ['easy', 'medium', 'hard', 'mixed'].map(d =>
       '<button data-act="diff" data-diff="' + d + '" class="' + (d === diff ? 'on' : '') + '">' + d[0].toUpperCase() + d.slice(1) + '</button>').join('') + '</div>' +
     '<div class="modes">' +
@@ -558,9 +588,32 @@ function renderHome() {
     '<div class="syncline" id="syncline">' + syncHtml() + '</div>';
 }
 
+function dailyCard(p) {
+  const today = todayKey();
+  const mine = p.daily && p.daily[today];
+  const others = Object.entries(state.players)
+    .filter(([n]) => n !== profile)
+    .map(([n, op]) => ({ n, res: op.daily && op.daily[today] }));
+  const rivals = others.map(o => escHtml(o.n) + ' ' + (o.res ? o.res.score + '/' + o.res.total : 'hasn’t played yet')).join(' · ');
+  let body;
+  if (mine) {
+    body = '<span><span class="mname">Daily Duel — you scored ' + mine.score + '/' + mine.total + '</span><br>' +
+      '<span class="mdesc">' + (rivals || 'Come back tomorrow for a new one.') + '</span></span>';
+    return '<div class="card mode wide" style="margin-bottom:14px"><span class="glyph">' + glyph('daily') + '</span>' + body + '</div>';
+  }
+  body = '<span><span class="mname">Daily Duel</span><br>' +
+    '<span class="mdesc">Same ten questions for everyone · one attempt' + (rivals ? ' · ' + rivals : '') + '</span></span>';
+  return '<button class="card mode wide" style="margin-bottom:14px" data-act="start" data-mode="daily">' +
+    '<span class="glyph">' + glyph('daily') + '</span>' + body + '</button>';
+}
+
 function startRound(mode) {
   const diff = lsGet(LS.diff, 'easy');
-  round = buildRound(mode, diff, player());
+  if (mode === 'daily') {
+    const p = player();
+    if (p.daily && p.daily[todayKey()]) return; // one attempt per day
+    round = buildDailyRound();
+  } else round = buildRound(mode, diff, player());
   if (!round.qs.length) { round = null; return; }
   round.i = 0; round.score = 0; round.streak = 0; round.bestStreak = 0; round.xp = 0;
   round.misses = []; round.answered = false; round.selA2 = null;
@@ -777,6 +830,12 @@ function nextQuestion() {
     const p = player();
     p.rounds.push({ ts: Date.now(), mode: round.mode, diff: round.diff, score: round.score, total: round.qs.length, xp: round.xp });
     if (p.rounds.length > 300) p.rounds = p.rounds.slice(-300);
+    if (round.mode === 'daily') {
+      p.daily = p.daily || {};
+      p.daily[todayKey()] = { score: round.score, total: round.qs.length };
+      const keys = Object.keys(p.daily).sort();
+      while (keys.length > 60) delete p.daily[keys.shift()];
+    }
     p.updatedAt = Date.now();
     saveLocal();
     screen = 'summary';
@@ -804,12 +863,26 @@ function renderSummary() {
     '<div class="sumstats">' +
     '<div><div class="val num" style="font-weight:800;font-size:22px;color:var(--brass)">+' + round.xp + '</div><div class="lab">xp earned</div></div>' +
     '<div><div class="val num" style="font-weight:800;font-size:22px">' + round.bestStreak + '</div><div class="lab">best streak</div></div>' +
-    '</div></div>' +
+    '</div>' + dailyRivalLine() + '</div>' +
     (misses ? '<div class="card misslist">' + misses + '</div>' : '') +
     '<div style="display:grid;gap:10px">' +
-    '<button class="btn btn-primary" data-act="again">Play again</button>' +
-    '<button class="btn btn-quiet" data-act="home">Back to base camp</button></div>' +
+    (round.mode === 'daily'
+      ? '<button class="btn btn-primary" data-act="home">Back to base camp</button>'
+      : '<button class="btn btn-primary" data-act="again">Play again</button>' +
+        '<button class="btn btn-quiet" data-act="home">Back to base camp</button>') + '</div>' +
     '<div class="syncline" id="syncline">' + syncHtml() + '</div>';
+}
+
+function dailyRivalLine() {
+  if (!round || round.mode !== 'daily') return '';
+  const today = todayKey();
+  const rows = Object.entries(state.players).filter(([n]) => n !== profile)
+    .map(([n, op]) => {
+      const res = op.daily && op.daily[today];
+      return escHtml(n) + (res ? ': ' + res.score + '/' + res.total : ' hasn’t played today yet');
+    });
+  if (!rows.length) return '';
+  return '<p class="caption" style="margin:12px 0 0">' + rows.join(' · ') + '</p>';
 }
 
 function meter(label, pct, count) {
