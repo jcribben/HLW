@@ -742,7 +742,8 @@ function renderRound() {
     '<div class="dots">' + dots + '</div>' +
     '<div class="streak num">' + (round.streak >= 2 ? '✦ ' + round.streak : '') + '</div>' +
     '</div>' + body;
-  if (q.mode === 'maphunt') initMapInteraction();
+  if (q.mode === 'maphunt') initMapInteraction([0, 0, 1000, 520], true);
+  else if (q.visual && q.visual.markerLL) initMapInteraction(zoomedVb(q.visual.markerLL, q.visual.zoom || 2.6), false);
 }
 
 function choiceBody(q) {
@@ -751,7 +752,7 @@ function choiceBody(q) {
   else if (q.visual && q.visual.shape) visual = '<div class="shapebox"><svg viewBox="0 0 200 200"><path d="' + q.visual.shape + '"/></svg></div>';
   else if (q.visual && q.visual.markerLL) {
     const vb = zoomedVb(q.visual.markerLL, q.visual.zoom || 2.6);
-    visual = '<div class="minimap"><svg viewBox="' + vb.join(' ') + '"><g>' + MAP_PATHS + '</g>' + markerSvg(q.visual.markerLL, vb[2]) + '</svg></div>';
+    visual = interactiveMapHtml(vb, markerSvg(q.visual.markerLL, vb[2]));
   }
   const opts = q.opts.map((o, i) =>
     '<button class="opt" data-act="answer" data-i="' + i + '">' +
@@ -764,11 +765,14 @@ function choiceBody(q) {
     '<div class="nextbar" id="nextbar"></div>';
 }
 
+function interactiveMapHtml(vb, extra) {
+  return '<div class="maparea" style="margin-bottom:12px"><div class="map-wrap" id="mapwrap">' + worldSvg(vb, extra) + '</div>' +
+    '<div class="zoomctl"><button data-act="zoom" data-z="in" aria-label="Zoom in">+</button><button data-act="zoom" data-z="out" aria-label="Zoom out">−</button></div></div>';
+}
 function maphuntBody(q) {
   return '<div class="prompt"><h2>' + escHtml(q.prompt) + '</h2>' +
     '<div class="sub">Drag to pan · pinch or buttons to zoom · tap to choose</div></div>' +
-    '<div class="maparea"><div class="map-wrap" id="mapwrap">' + worldSvg([0, 0, 1000, 520]) + '</div>' +
-    '<div class="zoomctl"><button data-act="zoom" data-z="in" aria-label="Zoom in">+</button><button data-act="zoom" data-z="out" aria-label="Zoom out">−</button></div></div>' +
+    interactiveMapHtml([0, 0, 1000, 520]) +
     '<div class="nextbar" id="nextbar"><button class="btn btn-primary" id="confirmbtn" data-act="confirm-map" disabled>Tap a country</button></div>';
 }
 
@@ -786,20 +790,24 @@ function zoomAt(cx, cy, factor) {
   mapVb = [cx - fx * nw, cy - fy * nh, nw, nh];
   applyVb();
 }
-function initMapInteraction() {
-  mapVb = [0, 0, 1000, 520];
+function initMapInteraction(vb0, selectable) {
+  mapVb = (vb0 || [0, 0, 1000, 520]).slice();
   const wrap = document.getElementById('mapwrap');
+  if (!wrap) return;
+  applyVb();
   const svg = wrap.querySelector('svg');
   const ptrs = new Map();
-  let moved = false, downAt = 0, pinchD = 0;
+  let moved = false, downAt = 0, pinchD = 0, downTarget = null, downPos = null;
   const toSvg = (px, py) => {
     const r = svg.getBoundingClientRect();
     return [mapVb[0] + (px - r.left) / r.width * mapVb[2], mapVb[1] + (py - r.top) / r.height * mapVb[3]];
   };
   wrap.addEventListener('pointerdown', e => {
+    // pointer capture retargets later events to `wrap`, so remember the real
+    // element under the finger now — pointerup's e.target is useless for taps
     wrap.setPointerCapture(e.pointerId);
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (ptrs.size === 1) { moved = false; downAt = Date.now(); }
+    if (ptrs.size === 1) { moved = false; downAt = Date.now(); downTarget = e.target; downPos = { x: e.clientX, y: e.clientY }; }
     if (ptrs.size === 2) {
       const [a, b] = [...ptrs.values()];
       pinchD = Math.hypot(a.x - b.x, a.y - b.y);
@@ -810,7 +818,9 @@ function initMapInteraction() {
     const prev = ptrs.get(e.pointerId);
     const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
     ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+    // fingers jitter: only count it as a drag once it strays 10px from the touch point
+    if (ptrs.size > 1 || (downPos && Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 10)) moved = true;
+    if (!moved && ptrs.size === 1) return; // don't pan on jitter, keep the tap clean
     const r = svg.getBoundingClientRect();
     if (ptrs.size === 1) {
       mapVb[0] -= dx / r.width * mapVb[2];
@@ -832,9 +842,13 @@ function initMapInteraction() {
     const wasTap = ptrs.size === 1 && !moved && Date.now() - downAt < 600;
     ptrs.delete(e.pointerId);
     pinchD = 0;
-    if (wasTap && !round.answered) {
-      const t = e.target.closest && e.target.closest('path[data-a2]');
-      if (t) selectCountry(t.getAttribute('data-a2'));
+    if (selectable && wasTap && round && !round.answered) {
+      // prefer the element under the finger at release; fall back to the
+      // pointerdown target (capture makes e.target unreliable here)
+      const el = document.elementFromPoint(e.clientX, e.clientY) || downTarget;
+      const t = el && el.closest ? el.closest('path[data-a2]') : null;
+      const t2 = t || (downTarget && downTarget.closest ? downTarget.closest('path[data-a2]') : null);
+      if (t2) selectCountry(t2.getAttribute('data-a2'));
     }
   };
   wrap.addEventListener('pointerup', up);
@@ -889,12 +903,14 @@ function answerChoice(i) {
   const fb = document.getElementById('feedback');
   let extra = '';
   if (q.fact) extra = '<div class="factbox">' + escHtml(q.fact) + '</div>';
+  let revealVb = null;
   if (q.revealLL) {
-    const vb = zoomedVb(q.revealLL, 3.2);
-    extra += '<div class="minimap" style="margin-top:12px"><svg viewBox="' + vb.join(' ') + '"><g>' + MAP_PATHS + '</g>' + markerSvg(q.revealLL, vb[2]) + '</svg></div>';
+    revealVb = zoomedVb(q.revealLL, 3.2);
+    extra += '<div style="margin-top:12px">' + interactiveMapHtml(revealVb, markerSvg(q.revealLL, revealVb[2])) + '</div>';
   }
   if (q.revealA2) extra += quickFactsHtml(q.revealA2);
   if (fb) fb.innerHTML = extra;
+  if (revealVb) initMapInteraction(revealVb, false);
   const nb = document.getElementById('nextbar');
   if (nb) nb.innerHTML = '<button class="btn btn-primary" data-act="next">' + (round.i + 1 < round.qs.length ? 'Continue' : 'See results') + '</button>';
   const dotEls = document.querySelectorAll('.dots span');
